@@ -4,12 +4,11 @@ RAG (Retrieval Augmented Generation) service for document-based Q&A.
 
 from typing import List, Dict, Any, Optional
 import logging
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 import chromadb
 
 from app.core.config import settings

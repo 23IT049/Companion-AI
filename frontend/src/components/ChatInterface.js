@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, LogOut } from 'lucide-react';
 import './ChatInterface.css';
 import MessageBubble from './MessageBubble';
 import DeviceSelector from './DeviceSelector';
@@ -14,7 +14,7 @@ const SUGGESTED_QUESTIONS = [
     "Dishwasher not cleaning dishes well",
 ];
 
-const ChatInterface = () => {
+const ChatInterface = ({ onLogout }) => {
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -112,6 +112,11 @@ const ChatInterface = () => {
                     onBrandChange={setBrand}
                     onModelChange={setModel}
                 />
+                {onLogout && (
+                    <button className="logout-button" onClick={onLogout} title="Logout">
+                        <LogOut size={20} />
+                    </button>
+                )}
             </div>
 
             <div className="chat-messages">

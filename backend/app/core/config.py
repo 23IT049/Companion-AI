@@ -41,14 +41,6 @@ class Settings(BaseSettings):
     mongodb_max_pool_size: int = Field(default=100, env="MONGODB_MAX_POOL_SIZE")
     mongodb_min_pool_size: int = Field(default=10, env="MONGODB_MIN_POOL_SIZE")
     
-    # Redis
-    redis_url: str = Field(default="redis://localhost:6379/0", env="REDIS_URL")
-    cache_ttl_seconds: int = Field(default=3600, env="CACHE_TTL_SECONDS")
-    
-    # Celery
-    celery_broker_url: str = Field(default="redis://localhost:6379/1", env="CELERY_BROKER_URL")
-    celery_result_backend: str = Field(default="redis://localhost:6379/2", env="CELERY_RESULT_BACKEND")
-    
     # Vector Database - ChromaDB
     chroma_host: str = Field(default="localhost", env="CHROMA_HOST")
     chroma_port: int = Field(default=8001, env="CHROMA_PORT")
