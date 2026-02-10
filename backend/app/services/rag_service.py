@@ -8,6 +8,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 import chromadb
 
@@ -67,6 +68,14 @@ class RAGService:
                     max_tokens=settings.llm_max_tokens,
                     openai_api_key=settings.openai_api_key
                 )
+            elif settings.llm_provider == "google":
+                self.llm = ChatGoogleGenerativeAI(
+                    model=settings.llm_model,
+                    temperature=settings.llm_temperature,
+                    google_api_key=settings.google_api_key
+                )
+            else:
+                raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
             
             logger.info("RAG service initialized successfully")
             
