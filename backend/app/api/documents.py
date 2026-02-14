@@ -8,7 +8,7 @@ import os
 import logging
 from datetime import datetime
 
-from app.models.database import User, Document as DocumentModel, DocumentStatus
+from app.models.database import User, ManualDocument, DocumentStatus, DeviceCategory
 from app.models.schemas import DocumentUploadResponse, DocumentListResponse, DocumentMetadata
 from app.core.auth import get_current_active_user
 from app.core.config import settings
@@ -27,6 +27,57 @@ def validate_file_extension(filename: str) -> bool:
 def validate_file_size(file_size: int) -> bool:
     """Check if file size is within limit."""
     return file_size <= settings.max_upload_size_bytes
+
+
+async def update_device_catalog(device_type: str, brand: str, model: str = None):
+    """
+    Update the device catalog with new device/brand/model information.
+    
+    Args:
+        device_type: Type of device
+        brand: Device brand
+        model: Optional device model
+    """
+    try:
+        # Find or create device category
+        category = await DeviceCategory.find_one(DeviceCategory.name == device_type)
+        
+        if not category:
+            # Create new category
+            category = DeviceCategory(
+                name=device_type,
+                brands=[brand],
+                models={brand: [model] if model else []}
+            )
+            await category.insert()
+            logger.info(f"Created new device category: {device_type}")
+        else:
+            # Update existing category
+            updated = False
+            
+            # Add brand if not exists
+            if brand not in category.brands:
+                category.brands.append(brand)
+                updated = True
+            
+            # Add model if provided
+            if model:
+                if brand not in category.models:
+                    category.models[brand] = [model]
+                    updated = True
+                elif model not in category.models[brand]:
+                    category.models[brand].append(model)
+                    updated = True
+            
+            if updated:
+                category.updated_at = datetime.utcnow()
+                await category.save()
+                logger.info(f"Updated device category: {device_type}")
+    
+    except Exception as e:
+        logger.error(f"Error updating device catalog: {e}")
+        # Don't fail the upload if catalog update fails
+
 
 
 @router.post("/upload-manual", response_model=DocumentUploadResponse)
@@ -51,6 +102,18 @@ async def upload_manual(
         Upload confirmation with document ID
     """
     try:
+        # Normalize inputs (trim whitespace, standardize)
+        device_type = device_type.strip() if device_type else ""
+        brand = brand.strip() if brand else ""
+        model = model.strip() if model and model.strip() else None
+        
+        # Validate inputs
+        if not device_type or not brand:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Device type and brand are required"
+            )
+        
         # Validate file extension
         if not validate_file_extension(file.filename):
             raise HTTPException(
@@ -82,7 +145,7 @@ async def upload_manual(
             f.write(contents)
         
         # Create document record
-        document = DocumentModel(
+        document = ManualDocument(
             filename=file.filename,
             device_type=device_type,
             brand=brand,
@@ -99,7 +162,11 @@ async def upload_manual(
         try:
             from app.services.document_processor import DocumentProcessor
             processor = DocumentProcessor()
-            await processor.process_document(document.id)
+            success = await processor.process_document(document.id)
+            
+            # Update device catalog if processing was successful
+            if success:
+                await update_device_catalog(device_type, brand, model)
         except Exception as e:
             logger.error(f"Error queuing document for processing: {e}")
             # Document will remain in PENDING status
@@ -150,16 +217,16 @@ async def list_documents(
         List of documents
     """
     # Build query
-    query = DocumentModel.uploaded_by.id == current_user.id
+    query = ManualDocument.uploaded_by.id == current_user.id
     
     if device_type:
-        query = query & (DocumentModel.device_type == device_type)
+        query = query & (ManualDocument.device_type == device_type)
     if brand:
-        query = query & (DocumentModel.brand == brand)
+        query = query & (ManualDocument.brand == brand)
     if status_filter:
         try:
             status_enum = DocumentStatus(status_filter)
-            query = query & (DocumentModel.status == status_enum)
+            query = query & (ManualDocument.status == status_enum)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -167,7 +234,7 @@ async def list_documents(
             )
     
     # Execute query
-    documents = await DocumentModel.find(query).sort("-uploaded_at").skip(skip).limit(limit).to_list()
+    documents = await ManualDocument.find(query).sort("-uploaded_at").skip(skip).limit(limit).to_list()
     
     # Format response
     return [
@@ -201,8 +268,8 @@ async def get_document(
     Returns:
         Document details
     """
-    document = await DocumentModel.find_one(
-        DocumentModel.document_id == document_id
+    document = await ManualDocument.find_one(
+        ManualDocument.document_id == document_id
     )
     
     if not document:
@@ -212,7 +279,7 @@ async def get_document(
         )
     
     # Verify ownership
-    await document.fetch_link(DocumentModel.uploaded_by)
+    await document.fetch_link(ManualDocument.uploaded_by)
     if document.uploaded_by.id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -247,8 +314,8 @@ async def delete_document(
     Returns:
         Success message
     """
-    document = await DocumentModel.find_one(
-        DocumentModel.document_id == document_id
+    document = await ManualDocument.find_one(
+        ManualDocument.document_id == document_id
     )
     
     if not document:
@@ -258,7 +325,7 @@ async def delete_document(
         )
     
     # Verify ownership
-    await document.fetch_link(DocumentModel.uploaded_by)
+    await document.fetch_link(ManualDocument.uploaded_by)
     if document.uploaded_by.id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -271,6 +338,13 @@ async def delete_document(
             os.remove(document.file_path)
     except Exception as e:
         logger.warning(f"Error deleting file: {e}")
+    
+    # Delete from vector store
+    try:
+        from app.services.rag_service import rag_service
+        rag_service.delete_document(document_id)
+    except Exception as e:
+        logger.warning(f"Error removing from vector store: {e}")
     
     # Delete document record
     await document.delete()

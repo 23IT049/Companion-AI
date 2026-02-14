@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     chunk_size: int = Field(default=1000, env="CHUNK_SIZE")
     chunk_overlap: int = Field(default=200, env="CHUNK_OVERLAP")
     retrieval_top_k: int = Field(default=5, env="RETRIEVAL_TOP_K")
-    relevance_threshold: float = Field(default=0.7, env="RELEVANCE_THRESHOLD")
+    relevance_threshold: float = Field(default=0.3, env="RELEVANCE_THRESHOLD")
     
     # Rate Limiting
     rate_limit_per_minute: int = Field(default=100, env="RATE_LIMIT_PER_MINUTE")

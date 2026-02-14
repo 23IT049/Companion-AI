@@ -9,7 +9,7 @@ import PyPDF2
 import pdfplumber
 from pathlib import Path
 
-from app.models.database import Document as DocumentModel, DocumentStatus
+from app.models.database import ManualDocument, DocumentStatus
 from app.services.rag_service import rag_service
 from app.core.config import settings
 
@@ -33,8 +33,18 @@ class DocumentProcessor:
         Returns:
             Extracted text content
         """
-        text = ""
+        import asyncio
+        from functools import partial
         
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, 
+            partial(self._extract_text_sync, file_path)
+        )
+
+    def _extract_text_sync(self, file_path: str) -> str:
+        """Synchronous helper for PDF extraction."""
+        text = ""
         try:
             # Try pdfplumber first (better for complex layouts)
             with pdfplumber.open(file_path) as pdf:
@@ -133,7 +143,7 @@ class DocumentProcessor:
         """
         try:
             # Get document from database
-            document = await DocumentModel.get(document_id)
+            document = await ManualDocument.get(document_id)
             
             if not document:
                 logger.error(f"Document {document_id} not found")
@@ -204,7 +214,7 @@ class DocumentProcessor:
             
             # Update document status to failed
             try:
-                document = await DocumentModel.get(document_id)
+                document = await ManualDocument.get(document_id)
                 if document:
                     document.status = DocumentStatus.FAILED
                     document.error_message = str(e)

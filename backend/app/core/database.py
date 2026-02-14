@@ -9,7 +9,7 @@ from typing import Optional
 import logging
 
 from app.core.config import settings
-from app.models.database import User, Conversation, Message, Feedback, Document
+from app.models.database import User, Conversation, Message, Feedback, ManualDocument, DeviceCategory
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,8 @@ class Database:
                     Conversation,
                     Message,
                     Feedback,
-                    Document,
+                    ManualDocument,
+                    DeviceCategory,
                 ]
             )
             

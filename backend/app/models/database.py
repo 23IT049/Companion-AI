@@ -115,7 +115,7 @@ class Feedback(Document):
         ]
 
 
-class Document(Document):
+class ManualDocument(Document):
     """Document metadata for uploaded manuals."""
     
     document_id: Indexed(str) = Field(default_factory=lambda: str(uuid.uuid4()))

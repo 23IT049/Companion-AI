@@ -145,21 +145,29 @@ Your response:"""
             top_k = settings.retrieval_top_k
         
         try:
-            # Build metadata filter
-            filter_dict = {}
+            # Build metadata filter using ChromaDB's where clause format
+            where_clause = None
+            conditions = []
+            
             if device_type:
-                filter_dict["device_type"] = device_type
+                conditions.append({"device_type": device_type})
             if brand:
-                filter_dict["brand"] = brand
+                conditions.append({"brand": brand})
             if model:
-                filter_dict["model"] = model
+                conditions.append({"model": model})
+            
+            # ChromaDB requires $and operator for multiple conditions
+            if len(conditions) > 1:
+                where_clause = {"$and": conditions}
+            elif len(conditions) == 1:
+                where_clause = conditions[0]
             
             # Perform similarity search
-            if filter_dict:
+            if where_clause:
                 results = self.vector_store.similarity_search_with_score(
                     query,
                     k=top_k,
-                    filter=filter_dict
+                    filter=where_clause
                 )
             else:
                 results = self.vector_store.similarity_search_with_score(
@@ -279,16 +287,49 @@ Your response:"""
             Number of chunks added
         """
         try:
-            self.vector_store.add_texts(
-                texts=texts,
-                metadatas=metadatas
+            import asyncio
+            from functools import partial
+            
+            loop = asyncio.get_running_loop()
+            
+            # Run blocking vector store operation in executor
+            await loop.run_in_executor(
+                None,
+                partial(
+                    self.vector_store.add_texts,
+                    texts=texts,
+                    metadatas=metadatas
+                )
             )
+            
             logger.info(f"Added {len(texts)} chunks to vector store")
             return len(texts)
             
         except Exception as e:
             logger.error(f"Error adding documents: {e}")
             raise
+    
+    def delete_document(self, document_id: str) -> bool:
+        """
+        Delete a document from the vector store.
+        
+        Args:
+            document_id: Document ID to delete
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Delete from vector store using metadata filter
+            self.vector_store._collection.delete(
+                where={"document_id": document_id}
+            )
+            logger.info(f"Deleted document {document_id} from vector store")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting document {document_id}: {e}")
+            return False
 
 
 # Global RAG service instance
