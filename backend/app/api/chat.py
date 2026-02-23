@@ -34,7 +34,7 @@ async def chat(
         # Get or create conversation
         if request.conversation_id:
             conversation = await Conversation.find_one(
-                Conversation.conversation_id == request.conversation_id
+                {"conversation_id": request.conversation_id}
             )
             if not conversation:
                 raise HTTPException(
@@ -118,30 +118,25 @@ async def get_conversation_history(
     Returns:
         Conversation details with all messages
     """
-    # Find conversation
+    # Find conversation AND verify ownership in one query — avoids fetch_link Motor incompatibility
     conversation = await Conversation.find_one(
-        Conversation.conversation_id == conversation_id
+        {
+            "conversation_id": conversation_id,
+            "user.$id": current_user.id
+        }
     )
-    
+
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found"
+            detail="Conversation not found or not authorized"
         )
-    
-    # Verify ownership
-    await conversation.fetch_link(Conversation.user)
-    if conversation.user.id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this conversation"
-        )
-    
-    # Get all messages
+
+    # Get all messages for this conversation
     messages = await Message.find(
-        Message.conversation.id == conversation.id
+        {"conversation.$id": conversation.id}
     ).sort("+created_at").to_list()
-    
+
     # Format response
     message_responses = [
         MessageResponse(
@@ -153,7 +148,7 @@ async def get_conversation_history(
         )
         for msg in messages
     ]
-    
+
     return ConversationHistoryResponse(
         conversation=ConversationResponse(
             conversation_id=conversation.conversation_id,
@@ -185,15 +180,16 @@ async def list_conversations(
     Returns:
         List of conversations
     """
+    # Use reliable dict-based filter for Link references
     conversations = await Conversation.find(
-        Conversation.user.id == current_user.id
+        {"user.$id": current_user.id}
     ).sort("-updated_at").skip(skip).limit(limit).to_list()
     
     # Get message counts
     responses = []
     for conv in conversations:
         message_count = await Message.find(
-            Message.conversation.id == conv.id
+            {"conversation.$id": conv.id}
         ).count()
         
         responses.append(
