@@ -32,6 +32,7 @@ const DeviceSelector = ({
             setAvailableBrands([]);
             setAvailableModels([]);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [deviceType, devices]);
 
     useEffect(() => {
@@ -44,6 +45,7 @@ const DeviceSelector = ({
         } else {
             setAvailableModels([]);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [brand, deviceType, devices]);
 
     const loadDevices = async () => {
