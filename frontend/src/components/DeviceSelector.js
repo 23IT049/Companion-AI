@@ -136,7 +136,7 @@ const DeviceSelector = ({
             </div>
 
             <div className="selector-group">
-                <label htmlFor="brand">Brand (Optional)</label>
+                <label htmlFor="brand">Brand</label>
                 <div className="select-wrapper">
                     <select
                         id="brand"
@@ -156,7 +156,7 @@ const DeviceSelector = ({
             </div>
 
             <div className="selector-group">
-                <label htmlFor="model">Model (Optional)</label>
+                <label htmlFor="model">Model</label>
                 <div className="select-wrapper">
                     <select
                         id="model"

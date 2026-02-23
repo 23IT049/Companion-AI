@@ -4,7 +4,7 @@ Document processing service for extracting and indexing manual content.
 
 import logging
 from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import PyPDF2
 import pdfplumber
 from pathlib import Path
@@ -203,7 +203,7 @@ class DocumentProcessor:
             # Update document status
             document.status = DocumentStatus.INDEXED
             document.chunks_count = chunks_added
-            document.processed_at = datetime.utcnow()
+            document.processed_at = datetime.now(timezone.utc)
             await document.save()
             
             logger.info(f"Successfully processed document: {document.filename}")

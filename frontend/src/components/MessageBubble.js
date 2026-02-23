@@ -106,7 +106,13 @@ const MessageBubble = ({ message }) => {
             )}
 
             <div className="message-timestamp">
-                {new Date(message.timestamp).toLocaleTimeString()}
+                {new Date(
+                    // Server sends UTC timestamps without 'Z' suffix — append it so
+                    // the browser correctly converts UTC → local time for display.
+                    typeof message.timestamp === 'string' && !message.timestamp.endsWith('Z') && !message.timestamp.includes('+')
+                        ? message.timestamp + 'Z'
+                        : message.timestamp
+                ).toLocaleTimeString()}
             </div>
         </div>
     );

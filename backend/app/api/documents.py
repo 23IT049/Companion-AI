@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from typing import List
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models.database import User, ManualDocument, DocumentStatus, DeviceCategory
 from app.models.schemas import DocumentUploadResponse, DocumentListResponse, DocumentMetadata
@@ -70,7 +70,7 @@ async def update_device_catalog(device_type: str, brand: str, model: str = None)
                     updated = True
             
             if updated:
-                category.updated_at = datetime.utcnow()
+                category.updated_at = datetime.now(timezone.utc)
                 await category.save()
                 logger.info(f"Updated device category: {device_type}")
     
@@ -136,7 +136,7 @@ async def upload_manual(
         os.makedirs(settings.upload_dir, exist_ok=True)
         
         # Generate unique filename
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         safe_filename = f"{device_type}_{brand}_{timestamp}_{file.filename}"
         file_path = os.path.join(settings.upload_dir, safe_filename)
         

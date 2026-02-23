@@ -3,7 +3,7 @@ Chat API endpoints for conversational troubleshooting.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from app.models.database import User, Conversation, Message, MessageRole
@@ -42,7 +42,7 @@ async def chat(
                     detail="Conversation not found"
                 )
             # Update conversation timestamp
-            conversation.updated_at = datetime.utcnow()
+            conversation.updated_at = datetime.now(timezone.utc)
             await conversation.save()
         else:
             # Create new conversation

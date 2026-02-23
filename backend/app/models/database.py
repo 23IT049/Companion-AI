@@ -6,7 +6,7 @@ These models represent collections in MongoDB.
 from beanie import Document, Indexed, Link
 from pydantic import Field, EmailStr
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 import uuid
 
@@ -32,8 +32,8 @@ class User(Document):
     email: Indexed(EmailStr, unique=True)
     hashed_password: str
     is_active: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     class Settings:
         name = "users"
@@ -51,8 +51,8 @@ class Conversation(Document):
     device_type: Optional[str] = None
     brand: Optional[str] = None
     model: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     class Settings:
         name = "conversations"
@@ -85,7 +85,7 @@ class Message(Document):
     role: MessageRole
     content: str
     sources: Optional[List[Dict[str, Any]]] = []
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     class Settings:
         name = "messages"
@@ -103,7 +103,7 @@ class Feedback(Document):
     message: Link[Message]
     rating: int  # 1 (thumbs down) or 5 (thumbs up)
     comment: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     class Settings:
         name = "feedback"
@@ -129,7 +129,7 @@ class ManualDocument(Document):
     error_message: Optional[str] = None
     chunks_count: int = 0
     uploaded_by: Link[User]
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     processed_at: Optional[datetime] = None
     
     class Settings:
@@ -152,8 +152,8 @@ class DeviceCategory(Document):
     brands: List[str] = []
     models: Dict[str, List[str]] = {}  # {brand: [model1, model2]}
     icon: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     class Settings:
         name = "device_categories"
