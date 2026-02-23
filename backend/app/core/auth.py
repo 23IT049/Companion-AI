@@ -5,7 +5,7 @@ Authentication utilities for JWT token handling and password hashing.
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -13,8 +13,8 @@ from app.core.config import settings
 from app.models.database import User
 from app.models.schemas import TokenData
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt max password length (hard limit)
+_BCRYPT_MAX_BYTES = 72
 
 # HTTP Bearer token scheme
 security = HTTPBearer()
@@ -22,12 +22,17 @@ security = HTTPBearer()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    # Truncate to 72 bytes — bcrypt's hard limit
+    secret = plain_password.encode("utf-8")[:_BCRYPT_MAX_BYTES]
+    hashed = hashed_password.encode("utf-8") if isinstance(hashed_password, str) else hashed_password
+    return bcrypt.checkpw(secret, hashed)
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password."""
-    return pwd_context.hash(password)
+    """Hash a password using bcrypt."""
+    # Truncate to 72 bytes — bcrypt's hard limit
+    secret = password.encode("utf-8")[:_BCRYPT_MAX_BYTES]
+    return bcrypt.hashpw(secret, bcrypt.gensalt()).decode("utf-8")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
