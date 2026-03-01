@@ -173,7 +173,7 @@ const ChatInterface = ({ onLogout }) => {
                             <Menu size={24} />
                         </button>
                         <div className="header-content">
-                            <h1 className="gradient-text">Device Troubleshoot AI</h1>
+                            <h1 className="gradient-text">Companion AI</h1>
                             <p className="header-subtitle">Get expert help with your device problems</p>
                         </div>
                     </div>
