@@ -51,7 +51,10 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
     anthropic_api_key: Optional[str] = Field(default=None, env="ANTHROPIC_API_KEY")
     google_api_key: Optional[str] = Field(default=None, env="GOOGLE_API_KEY")
+    groq_api_key: Optional[str] = Field(default=None, env="GROQ_API_KEY")
+    xai_api_key: Optional[str] = Field(default=None, env="XAI_API_KEY")
     llm_model: str = Field(default="gpt-4-turbo-preview", env="LLM_MODEL")
+    groq_model: str = Field(default="llama-3.3-70b-versatile", env="GROQ_MODEL")
     llm_temperature: float = Field(default=0.3, env="LLM_TEMPERATURE")
     llm_max_tokens: int = Field(default=1000, env="LLM_MAX_TOKENS")
     

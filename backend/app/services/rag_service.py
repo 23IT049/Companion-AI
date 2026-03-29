@@ -14,6 +14,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 
 import uuid
@@ -43,6 +44,7 @@ class RAGService:
         self.vector_store = None
         self.qdrant_client = None
         self.llm = None
+        self.groq_llm = None
         self.text_splitter = None
         self.initialized = False
         try:
@@ -96,7 +98,7 @@ class RAGService:
                 embedding=self.embeddings,
             )
 
-            # LLM
+            # LLM - primary (Gemini)
             if settings.llm_provider == "openai":
                 self.llm = ChatOpenAI(
                     model_name=settings.llm_model,
@@ -112,6 +114,20 @@ class RAGService:
                 )
             else:
                 raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
+
+            # LLM - secondary (Groq)
+            if settings.groq_api_key:
+                try:
+                    self.groq_llm = ChatGroq(
+                        model=settings.groq_model,
+                        temperature=settings.llm_temperature,
+                        groq_api_key=settings.groq_api_key,
+                    )
+                    logger.info(f"Groq LLM initialised with model: {settings.groq_model}")
+                except Exception as groq_err:
+                    logger.warning(f"Groq LLM failed to initialise: {groq_err}")
+            else:
+                logger.info("GROQ_API_KEY not set — Groq model unavailable")
 
             logger.info("RAG service initialised successfully with Qdrant Cloud")
 
@@ -174,24 +190,22 @@ class RAGService:
 
     def create_prompt_template(self) -> PromptTemplate:
         """Create the prompt template for troubleshooting."""
-        template = """You are a device manual assistant. Your ONLY job is to answer questions using the manual excerpts provided below.
-
-=== STRICT RULES ===
-1. ONLY use information explicitly stated in the manual excerpts below.
-2. Do NOT add general knowledge, personal expertise, or information from outside the excerpts.
-3. If the excerpts do not contain enough information to answer the question, say exactly:
-   "The available manual sections do not cover this specific issue. Please consult the full manual or contact customer support."
-4. Always cite the Source and Page number when referencing a step.
-5. Safety warnings: only mention those explicitly stated in the excerpts.
-
-=== MANUAL EXCERPTS ===
-{context}
-
-=== USER QUESTION ===
-{question}
-
-=== YOUR RESPONSE ===
-Based strictly on the manual excerpts above:"""
+        template = (
+            "You are a friendly and knowledgeable device assistant helping a user with their product.\n\n"
+            "Answer based ONLY on the manual excerpts below. Follow these rules:\n"
+            "- Write in a natural, conversational tone — like a helpful friend, not a technical document.\n"
+            "- Be concise. Summarise the manual content in plain language instead of quoting it verbatim.\n"
+            "- If the answer involves steps, use a clean numbered list.\n"
+            "- Do NOT put source references mid-sentence. Add one clean '📖 Source:' line at the very end.\n"
+            "- If an important safety tip is mentioned in the excerpts, include it naturally in your answer.\n"
+            "- If the excerpts don't contain enough information, say: "
+            "'I don\\'t have enough detail in the available manuals for that. "
+            "Please check the full manual or contact support.'\n"
+            "- Never invent information not present in the excerpts.\n\n"
+            "MANUAL EXCERPTS:\n{context}\n\n"
+            "USER QUESTION:\n{question}\n\n"
+            "YOUR ANSWER:"
+        )
 
         return PromptTemplate(template=template, input_variables=["context", "question"])
 
@@ -291,6 +305,7 @@ Based strictly on the manual excerpts above:"""
         device_type: Optional[str] = None,
         brand: Optional[str] = None,
         model: Optional[str] = None,
+        ai_model: Optional[str] = "gemini",
     ) -> Dict[str, Any]:
         """Generate an answer using RAG."""
         try:
@@ -326,7 +341,16 @@ Based strictly on the manual excerpts above:"""
             prompt_template = self.create_prompt_template()
             prompt = prompt_template.format(context=context, question=query)
 
-            response = await self.llm.ainvoke(prompt)
+            # Select LLM based on ai_model param
+            if ai_model == "groq" and self.groq_llm is not None:
+                active_llm = self.groq_llm
+                logger.info("Using Groq LLM for this request")
+            else:
+                active_llm = self.llm
+                if ai_model == "groq":
+                    logger.warning("Groq LLM not available, falling back to primary LLM")
+
+            response = await active_llm.ainvoke(prompt)
             answer = response.content if hasattr(response, "content") else str(response)
 
             sources = [

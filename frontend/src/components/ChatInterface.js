@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, LogOut, Menu } from 'lucide-react';
+import { Send, Loader2, LogOut, Menu, ChevronDown } from 'lucide-react';
 import './ChatInterface.css';
 import MessageBubble from './MessageBubble';
 import DeviceSelector from './DeviceSelector';
@@ -25,7 +25,10 @@ const ChatInterface = ({ onLogout }) => {
     const [model, setModel] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+    const [aiModel, setAiModel] = useState('gemini');
+    const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
     const messagesEndRef = useRef(null);
+    const modelDropdownRef = useRef(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -34,6 +37,24 @@ const ChatInterface = ({ onLogout }) => {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    // Close model dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target)) {
+                setIsModelDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const AI_MODELS = [
+        { id: 'gemini', label: 'Gemini', icon: '✦', description: 'Google Gemini 2.5 Flash' },
+        { id: 'groq', label: 'Groq',   icon: '⚡', description: 'Llama 3.3 70B · Groq' },
+    ];
+
+    const selectedModel = AI_MODELS.find(m => m.id === aiModel) || AI_MODELS[0];
 
     const handleNewChat = () => {
         setConversationId(null);
@@ -113,7 +134,8 @@ const ChatInterface = ({ onLogout }) => {
                 deviceType,
                 brand,
                 model,
-                conversationId
+                conversationId,
+                aiModel
             );
 
             // Update conversation ID if new
@@ -229,6 +251,41 @@ const ChatInterface = ({ onLogout }) => {
                 </div>
 
                 <div className="chat-input-container glass-effect">
+                    <div className="model-selector-bar">
+                        <div className="model-selector-dropdown" ref={modelDropdownRef}>
+                            <button
+                                className="model-selector-trigger"
+                                onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                                title="Select AI model"
+                                id="model-selector-btn"
+                            >
+                                <span className="model-icon">{selectedModel.icon}</span>
+                                <span className="model-label">{selectedModel.label}</span>
+                                <ChevronDown
+                                    size={14}
+                                    className={`model-chevron ${isModelDropdownOpen ? 'open' : ''}`}
+                                />
+                            </button>
+                            {isModelDropdownOpen && (
+                                <div className="model-dropdown-menu">
+                                    {AI_MODELS.map(m => (
+                                        <button
+                                            key={m.id}
+                                            className={`model-option ${aiModel === m.id ? 'active' : ''}`}
+                                            onClick={() => { setAiModel(m.id); setIsModelDropdownOpen(false); }}
+                                        >
+                                            <span className="model-option-icon">{m.icon}</span>
+                                            <div className="model-option-text">
+                                                <span className="model-option-name">{m.label}</span>
+                                                <span className="model-option-desc">{m.description}</span>
+                                            </div>
+                                            {aiModel === m.id && <span className="model-option-check">✓</span>}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                     <div className="chat-input-wrapper">
                         <textarea
                             className="chat-input"

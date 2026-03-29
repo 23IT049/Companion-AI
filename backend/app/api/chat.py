@@ -68,7 +68,8 @@ async def chat(
             query=request.query,
             device_type=request.device_type,
             brand=request.brand,
-            model=request.model
+            model=request.model,
+            ai_model=request.ai_model or "gemini",
         )
         
         # Format sources

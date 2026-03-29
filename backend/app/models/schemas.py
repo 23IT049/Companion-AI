@@ -54,6 +54,7 @@ class ChatRequest(BaseModel):
     brand: Optional[str] = None
     model: Optional[str] = None
     conversation_id: Optional[str] = None
+    ai_model: Optional[str] = Field(default="gemini", description="AI model to use: 'gemini' or 'groq'")
     
     class Config:
         json_schema_extra = {
@@ -62,7 +63,8 @@ class ChatRequest(BaseModel):
                 "device_type": "Refrigerator",
                 "brand": "Samsung",
                 "model": "RF28R7351SR",
-                "conversation_id": None
+                "conversation_id": None,
+                "ai_model": "gemini"
             }
         }
 

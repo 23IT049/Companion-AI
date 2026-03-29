@@ -75,13 +75,14 @@ export const authAPI = {
 // ============================================================================
 
 export const chatAPI = {
-    sendMessage: async (query, deviceType, brand, model, conversationId) => {
+    sendMessage: async (query, deviceType, brand, model, conversationId, aiModel = 'gemini') => {
         const response = await apiClient.post('/chat', {
             query,
             device_type: deviceType,
             brand,
             model,
             conversation_id: conversationId,
+            ai_model: aiModel,
         });
         return response.data;
     },
