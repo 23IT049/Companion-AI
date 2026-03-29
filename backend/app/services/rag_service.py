@@ -174,30 +174,24 @@ class RAGService:
 
     def create_prompt_template(self) -> PromptTemplate:
         """Create the prompt template for troubleshooting."""
-        template = """You are an expert device repair technician with years of experience troubleshooting various household appliances and electronics.
+        template = """You are a device manual assistant. Your ONLY job is to answer questions using the manual excerpts provided below.
 
-Using the manual excerpts provided below, provide clear, step-by-step troubleshooting instructions for the user's problem.
+=== STRICT RULES ===
+1. ONLY use information explicitly stated in the manual excerpts below.
+2. Do NOT add general knowledge, personal expertise, or information from outside the excerpts.
+3. If the excerpts do not contain enough information to answer the question, say exactly:
+   "The available manual sections do not cover this specific issue. Please consult the full manual or contact customer support."
+4. Always cite the Source and Page number when referencing a step.
+5. Safety warnings: only mention those explicitly stated in the excerpts.
 
-Context from device manuals:
+=== MANUAL EXCERPTS ===
 {context}
 
-User Question: {question}
+=== USER QUESTION ===
+{question}
 
-Instructions for your response:
-1. Start by diagnosing the most likely cause of the problem
-2. Provide clear, numbered step-by-step troubleshooting instructions
-3. Include any relevant safety warnings (electrical hazards, water damage risks, etc.)
-4. Cite the specific manual section you're referencing
-5. If the problem requires professional repair, clearly state this
-6. If the provided context doesn't contain relevant information, honestly say "I don't have specific information about this in the available manuals" and provide general guidance if appropriate
-
-Important:
-- Be conversational and friendly, but professional
-- Use simple language, avoiding technical jargon when possible
-- If you use technical terms, briefly explain them
-- Prioritize user safety above all else
-
-Your response:"""
+=== YOUR RESPONSE ===
+Based strictly on the manual excerpts above:"""
 
         return PromptTemplate(template=template, input_variables=["context", "question"])
 
@@ -213,9 +207,17 @@ Your response:"""
         model: Optional[str] = None,
         top_k: int = None,
     ) -> List[Dict[str, Any]]:
-        """Retrieve relevant document chunks for a query using Qdrant filters."""
+        """Retrieve relevant document chunks for a query using Qdrant filters.
+
+        Fetches 2x candidates then deduplicates by content similarity so the
+        final top_k chunks are diverse — preventing 5 near-identical chunks
+        from the same manual page from dominating the context window.
+        """
         if top_k is None:
             top_k = settings.retrieval_top_k
+
+        # Fetch extra candidates so dedup doesn't leave us short
+        fetch_k = top_k * 2
 
         try:
             # Build Qdrant filter from optional metadata fields
@@ -228,36 +230,51 @@ Your response:"""
                 partial(
                     self.vector_store.similarity_search_with_score,
                     query,
-                    k=top_k,
+                    k=fetch_k,
                     filter=qdrant_filter,
                 ),
             )
 
-            # Format results
-            # NOTE: Two payload schemas coexist:
-            #   Schema A (PDF uploads)   – flat top-level keys
-            #   Schema B (ChromaDB mig.) – fields nested under a 'metadata' dict
-            # _get_meta() resolves a field from either location transparently.
+            # ------------------------------------------------------------------
+            # Deduplicate: drop chunks whose first 150 chars overlap heavily
+            # with an already-accepted chunk.  This prevents 5 consecutive
+            # overlapping chunks from the same page filling the entire context.
+            # ------------------------------------------------------------------
+            seen_prefixes: list[str] = []
             chunks = []
+
             for doc, score in results:
-                # Qdrant cosine similarity score is already in [0,1] (higher = more similar)
                 relevance_score = float(score)
+                if relevance_score < settings.relevance_threshold:
+                    continue
 
-                if relevance_score >= settings.relevance_threshold:
-                    chunks.append(
-                        {
-                            "content": doc.page_content,
-                            "source_file": self._get_meta(doc.metadata, "source_file", "Unknown"),
-                            "page_number": self._get_meta(doc.metadata, "page_number"),
-                            "section_name": self._get_meta(doc.metadata, "section_name"),
-                            "relevance_score": round(relevance_score, 3),
-                            "device_type": self._get_meta(doc.metadata, "device_type"),
-                            "brand": self._get_meta(doc.metadata, "brand"),
-                            "model": self._get_meta(doc.metadata, "model"),
-                        }
-                    )
+                # Use the first 150 chars as a near-duplicate fingerprint
+                prefix = doc.page_content[:150].lower().strip()
+                is_dup = any(
+                    self._overlap_ratio(prefix, s) > 0.7
+                    for s in seen_prefixes
+                )
+                if is_dup:
+                    continue
 
-            logger.info(f"Retrieved {len(chunks)} relevant chunks for query: {query[:50]}...")
+                seen_prefixes.append(prefix)
+                chunks.append(
+                    {
+                        "content": doc.page_content,
+                        "source_file": self._get_meta(doc.metadata, "source_file", "Unknown"),
+                        "page_number": self._get_meta(doc.metadata, "page_number"),
+                        "section_name": self._get_meta(doc.metadata, "section_name"),
+                        "relevance_score": round(relevance_score, 3),
+                        "device_type": self._get_meta(doc.metadata, "device_type"),
+                        "brand": self._get_meta(doc.metadata, "brand"),
+                        "model": self._get_meta(doc.metadata, "model"),
+                    }
+                )
+
+                if len(chunks) >= top_k:
+                    break
+
+            logger.info(f"Retrieved {len(chunks)} diverse chunks for query: {query[:50]}...")
             return chunks
 
         except Exception as e:
@@ -293,12 +310,18 @@ Your response:"""
                     "sources": [],
                 }
 
-            context = "\n\n".join(
-                [
-                    f"[Source: {chunk['source_file']}, Page: {chunk.get('page_number', 'N/A')}]\n{chunk['content']}"
-                    for chunk in chunks
-                ]
-            )
+            # Build context — include section name and relevance so the LLM
+            # can see how well each chunk matches and prioritise accordingly.
+            context_parts = []
+            for i, chunk in enumerate(chunks, 1):
+                section = chunk.get("section_name") or "General"
+                context_parts.append(
+                    f"[Excerpt {i} | Source: {chunk['source_file']} | "
+                    f"Page: {chunk.get('page_number', 'N/A')} | "
+                    f"Section: {section} | Relevance: {chunk['relevance_score']:.0%}]\n"
+                    f"{chunk['content']}"
+                )
+            context = "\n\n---\n\n".join(context_parts)
 
             prompt_template = self.create_prompt_template()
             prompt = prompt_template.format(context=context, question=query)
@@ -469,6 +492,17 @@ Your response:"""
         if isinstance(nested, dict) and key in nested and nested[key] is not None:
             return nested[key]
         return default
+
+    @staticmethod
+    def _overlap_ratio(a: str, b: str) -> float:
+        """Estimate character-level overlap between two short strings."""
+        if not a or not b:
+            return 0.0
+        set_a = set(a.split())
+        set_b = set(b.split())
+        if not set_a:
+            return 0.0
+        return len(set_a & set_b) / len(set_a)
 
     def _build_filter(
         self,
