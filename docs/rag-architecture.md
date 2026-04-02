@@ -7,24 +7,24 @@ This document describes the Retrieval Augmented Generation (RAG) system implemen
 ## How It Works — End to End
 
 ```
-                        INDEXING PIPELINE (on upload)
+                        INDEXING PIPELINE (on manual upload)
         ┌──────────┐    ┌──────────────┐    ┌──────────────┐    ┌─────────────┐
         │  PDF/TXT │───▶│ Text Extract │───▶│  Chunking    │───▶│  Embedding  │
-        │  Upload  │    │ (pdfplumber/ │    │  (LangChain  │    │  (HuggingF- │
+        │  Upload  │    │ (pdfplumber/ │    │ (LangChain   │    │ (HuggingF-  │
         └──────────┘    │  PyPDF2)     │    │  splitter)   │    │  ace MiniLM)│
                         └──────────────┘    └──────────────┘    └──────┬──────┘
                                                                         │
                                                                         ▼
                                                                ┌─────────────────┐
-                                                               │  ChromaDB       │
+                                                               │  Qdrant Cloud   │
                                                                │  (vector store) │
                                                                └─────────────────┘
 
                         QUERY PIPELINE (on chat message)
         ┌──────────┐    ┌──────────────┐    ┌──────────────┐    ┌─────────────┐
-        │  User    │───▶│  Embed query │───▶│  Similarity  │───▶│  Top-k      │
+        │  User    │───▶│  Embed query │───▶│  Similarity  │───▶│ Dedup top-k │
         │  Query   │    │  (MiniLM)    │    │  Search +    │    │  chunks     │
-        └──────────┘    └──────────────┘    │  metadata    │    │  (filtered) │
+        └──────────┘    └──────────────┘    │  Qdrant      │    │ (filtered)  │
                                             │  filter      │    └──────┬──────┘
                                             └──────────────┘           │
                                                                         ▼
@@ -35,8 +35,8 @@ This document describes the Retrieval Augmented Generation (RAG) system implemen
                                                                        │
                                                                        ▼
                                                               ┌──────────────────┐
-                                                              │  LLM (GPT-4 /    │
-                                                              │  Gemini)         │
+                                                              │  LLM             │
+                                                              │  Gemini / Groq   │
                                                               └────────┬─────────┘
                                                                        │
                                                                        ▼
@@ -54,17 +54,17 @@ This document describes the Retrieval Augmented Generation (RAG) system implemen
 
 **File:** `app/services/document_processor.py`
 
-Supports PDF and plain text files. For PDFs, it tries two extractors:
+Supports PDF and plain text files. For PDFs, two extractors are tried in order:
 
 | Extractor | When used |
 |---|---|
-| `pdfplumber` | First attempt — better for complex layouts, tables |
-| `PyPDF2` | Fallback if pdfplumber fails |
+| `pdfplumber` | First attempt — better for complex layouts and tables |
+| `PyPDF2` | Fallback if pdfplumber fails or returns empty text |
 
 After extraction the text is cleaned: strips blank lines, collapses consecutive newlines.
 
-It also scans the first 50 lines for auto-metadata hints:
-- Detects `model` mentions → `detected_model`
+The first 50 lines are also scanned for **auto-metadata hints**:
+- Detects `model` mentions → stored as `detected_model`
 - Detects section type from keywords: `troubleshooting`, `installation`, `user guide`
 
 ### 2. Chunking (`RecursiveCharacterTextSplitter`)
@@ -79,35 +79,45 @@ RecursiveCharacterTextSplitter(
 )
 ```
 
-Splits by double-newline first (paragraph), then single newline, then space, then characters — ensuring chunks respect document structure.
+Splits by double-newline first (paragraph boundary), then single newline, then space, then characters — so chunks respect document structure.
 
 ### 3. Metadata per Chunk
 
-Each chunk is stored with:
+Each chunk is stored with flat top-level payload fields:
 
 ```python
 {
     "source_file": "Samsung_TV_Q7F_Manual.pdf",
     "device_type": "TV",
-    "brand": "Samsung",
-    "model": "Q7F",           # or "Unknown" if not provided
+    "brand":       "Samsung",
+    "model":       "Q7F",            # or "Unknown" if not provided
     "document_id": "<uuid>",
     "chunk_index": 0,
     "total_chunks": 42,
-    # + any auto-detected metadata (section_type, detected_model)
+    # + auto-detected: section_type, detected_model
 }
 ```
 
-### 4. Embedding & Storage
+> **Note — Dual Payload Schema:** The collection also contains points that were migrated from an older ChromaDB instance. Those points nest all fields under a `metadata` key (e.g. `metadata.device_type`). Both schemas are fully supported by the filter and retrieval logic.
 
-**Embedding model:** `sentence-transformers/all-MiniLM-L6-v2` (runs locally on CPU)
-- Dimension: 384
-- Embeddings are L2-normalized (`normalize_embeddings=True`)
+### 4. Embedding
 
-**Vector store:** ChromaDB HTTP client connecting to `localhost:8001`
-- Collection name: `device_manuals` (configurable)
-- Chunks added via `vector_store.add_texts(texts, metadatas)`
-- Runs in a thread executor to avoid blocking the FastAPI async loop
+**Model:** `sentence-transformers/all-MiniLM-L6-v2` — runs locally on CPU  
+**Dimension:** 384  
+**Normalization:** L2-normalized (`normalize_embeddings=True`)
+
+### 5. Batched Upsert to Qdrant Cloud
+
+**File:** `app/services/rag_service.py` — `add_documents()`
+
+Large documents are uploaded in **batches of 25 chunks** to avoid Qdrant Cloud timeout limits. Each batch goes through two phases:
+
+1. **Embed** — compute 384-dim vectors from text (CPU-bound, no network)
+2. **Upsert** — push pre-computed `PointStruct` objects to Qdrant (fast network call)
+
+Upsert is retried **up to 3 times** (5-second pause) before failing the batch. Embeddings are cached per batch so they are never recomputed on a retry.
+
+Payload indexes are also created idempotently on startup for all filterable fields (`device_type`, `brand`, `model`, `document_id` — and their `metadata.*` equivalents) to enable efficient `must`/`should` filtering.
 
 ---
 
@@ -115,70 +125,78 @@ Each chunk is stored with:
 
 ### 1. Metadata Filtering
 
-User can optionally filter by `device_type`, `brand`, and/or `model`. These map directly to ChromaDB `where` clauses:
+The user can optionally narrow results by `device_type`, `brand`, and/or `model` via the Device Selector UI. These map to Qdrant `FieldCondition` filters.
+
+Because two payload schemas coexist, each filter field matches **either** schema via a `should` (OR) sub-clause. Multiple filters are wrapped in a `must` (AND) block:
 
 ```python
-# Single filter
-{"device_type": "TV"}
-
-# Multiple filters use $and
-{"$and": [{"device_type": "TV"}, {"brand": "Samsung"}]}
+Filter(must=[
+    Filter(should=[
+        FieldCondition(key="device_type",          match=MatchValue(value="TV")),
+        FieldCondition(key="metadata.device_type", match=MatchValue(value="TV")),
+    ]),
+    Filter(should=[
+        FieldCondition(key="brand",          match=MatchValue(value="Samsung")),
+        FieldCondition(key="metadata.brand", match=MatchValue(value="Samsung")),
+    ]),
+])
 ```
 
 ### 2. Similarity Search
 
 ```python
-vector_store.similarity_search_with_score(query, k=5)
+vector_store.similarity_search_with_score(query, k=top_k * 2, filter=qdrant_filter)
 ```
 
-Default `top_k = 5` (configurable via `RETRIEVAL_TOP_K`).
+- Default `top_k = 5` (configurable via `RETRIEVAL_TOP_K`)
+- Fetches `2× top_k` candidates so the deduplication step below has room to work
+- Qdrant uses **cosine similarity**; scores are returned directly as relevance values (0–1)
+- Chunks below the relevance threshold (`0.3` default, via `RELEVANCE_THRESHOLD`) are discarded
 
-Returns `(Document, distance_score)` pairs. Distance is converted to a relevance score:
+All blocking Qdrant calls are run in a thread executor (`loop.run_in_executor`) to keep the FastAPI async loop unblocked.
 
-```python
-relevance_score = 1 / (1 + distance)
+### 3. Deduplication
+
+After retrieval, chunks whose first 150 characters share more than **70% word-level overlap** with an already-accepted chunk are dropped. This prevents five nearly-identical consecutive chunks from the same manual page from filling the entire context window.
+
+### 4. Prompt Assembly
+
+Passing chunks are formatted with inline metadata so the LLM can prioritise them:
+
 ```
-
-Chunks below the relevance threshold (`0.3` default, via `RELEVANCE_THRESHOLD`) are discarded.
-
-### 3. Prompt Assembly
-
-All passing chunks are formatted as:
-
-```
-[Source: Samsung_TV_Q7F_Manual.pdf, Page: 12]
+[Excerpt 1 | Source: Samsung_TV_Q7F_Manual.pdf | Page: 12 | Section: Troubleshooting | Relevance: 85%]
 <chunk text>
 
-[Source: Samsung_TV_Q7F_Manual.pdf, Page: 13]
+---
+
+[Excerpt 2 | Source: Samsung_TV_Q7F_Manual.pdf | Page: 13 | Section: Troubleshooting | Relevance: 78%]
 <chunk text>
-...
 ```
 
-This context is injected into the prompt template alongside the user's question.
+### 5. Prompt Template
 
-### 4. Prompt Template
+The system prompt instructs the LLM to behave as a **friendly device assistant**:
 
-The system prompt instructs the LLM to act as a device repair technician:
+- Answer **only** from the manual excerpts provided
+- Write in a natural, conversational tone — not like a technical document
+- Use a clean numbered list for step-by-step answers
+- Add a single `📖 Source:` line at the end — no mid-sentence citations
+- Include safety tips if mentioned in the excerpts
+- Honestly admit when the excerpts don't contain enough information
+- **Never invent information** not present in the excerpts
 
-- Diagnose the most likely cause
-- Provide numbered step-by-step instructions
-- Include safety warnings (electrical, water)
-- Cite the manual section being referenced
-- Recommend professional help when needed
-- If no relevant context, admit it honestly rather than hallucinating
-
-### 5. LLM Generation
+### 6. LLM Generation
 
 **File:** `app/services/rag_service.py` — `generate_answer()`
 
-Supports two providers (configured via `LLM_PROVIDER` env var):
+Two LLM providers are supported, selected per request via the `ai_model` parameter (set by the model selector dropdown in the UI):
 
-| Provider | Model | Config key |
-|---|---|---|
-| `openai` | `gpt-4-turbo-preview` | `OPENAI_API_KEY` |
-| `google` | configurable | `GOOGLE_API_KEY` |
+| Provider | Model | Config key | Notes |
+|---|---|---|---|
+| `gemini` (default) | configurable via `LLM_MODEL` | `GOOGLE_API_KEY` | Primary LLM |
+| `groq` | `llama-3.3-70b-versatile` (via `GROQ_MODEL`) | `GROQ_API_KEY` | Falls back to Gemini if not configured |
 
-Default settings:
+Default generation settings:
 ```
 temperature = 0.3   (low = more factual, less creative)
 max_tokens  = 1000
@@ -186,9 +204,9 @@ max_tokens  = 1000
 
 Uses `llm.ainvoke(prompt)` — fully async.
 
-### 6. Response
+### 7. Response
 
-Returns up to **5 source citations** alongside the answer:
+Returns the answer plus up to **5 source citations**:
 
 ```json
 {
@@ -211,32 +229,54 @@ Returns up to **5 source citations** alongside the answer:
 
 ```
 Upload → PENDING → PROCESSING → INDEXED
-                              → FAILED (on error, with error_message)
+                              → FAILED (with error_message)
 ```
 
-`ManualDocument` stores: filename, device_type, brand, model, file_path, file_size, status, chunks_count, processed_at.
+`ManualDocument` stores: `filename`, `device_type`, `brand`, `model`, `file_path`, `file_size`, `status`, `chunks_count`, `processed_at`.
+
+The `/api/v1/devices` endpoint reads this collection dynamically to populate the Device Selector dropdowns — no separate `DeviceCategory` collection is needed.
+
+---
+
+## RAG Evaluation
+
+An offline evaluation harness is available to measure retrieval and generation quality without a live browser session:
+
+**File:** `backend/evaluation/evaluate_rag.py`
+
+```powershell
+cd backend
+python evaluation/evaluate_rag.py
+```
+
+- Reads ground-truth Q&A pairs from `evaluation/eval_questions_real.json`
+- Calls `rag_service.generate_answer()` directly for each question
+- Scores responses and writes detailed results to `evaluation/results/rag_eval_<timestamp>.json`
+
+Use `evaluation/discover_indexed_data.py` to inspect what documents and device categories are currently indexed in Qdrant.
 
 ---
 
 ## Configuration Reference
 
-All values are overridable via `.env`:
+All values are overridable via `backend/.env`:
 
 | Variable | Default | Description |
 |---|---|---|
 | `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | HuggingFace embedding model |
-| `EMBEDDING_DIMENSION` | `384` | Vector dimension |
+| `EMBEDDING_DIMENSION` | `384` | Vector dimension (must match model) |
 | `CHUNK_SIZE` | `1000` | Max characters per chunk |
 | `CHUNK_OVERLAP` | `200` | Overlap between adjacent chunks |
-| `RETRIEVAL_TOP_K` | `5` | Number of chunks retrieved per query |
-| `RELEVANCE_THRESHOLD` | `0.3` | Min relevance score to include a chunk |
-| `LLM_PROVIDER` | `openai` | `openai` or `google` |
-| `LLM_MODEL` | `gpt-4-turbo-preview` | Model name |
+| `RETRIEVAL_TOP_K` | `5` | Final number of chunks returned per query |
+| `RELEVANCE_THRESHOLD` | `0.3` | Min cosine relevance score to keep a chunk |
+| `LLM_PROVIDER` | `gemini` | Primary provider: `gemini` |
+| `LLM_MODEL` | `gemini-*` | Gemini model name |
+| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Groq model name |
 | `LLM_TEMPERATURE` | `0.3` | Generation temperature (0 = deterministic) |
 | `LLM_MAX_TOKENS` | `1000` | Max tokens in LLM response |
-| `CHROMA_HOST` | `localhost` | ChromaDB server host |
-| `CHROMA_PORT` | `8001` | ChromaDB server port |
-| `CHROMA_COLLECTION_NAME` | `device_manuals` | ChromaDB collection |
+| `QDRANT_URL` | — | Qdrant Cloud cluster URL |
+| `QDRANT_API_KEY` | — | Qdrant Cloud API key |
+| `QDRANT_COLLECTION_NAME` | `device_manuals` | Qdrant collection name |
 
 ---
 
@@ -244,13 +284,22 @@ All values are overridable via `.env`:
 
 ```
 backend/app/services/
-├── rag_service.py          # RAGService class — embeddings, vector store, LLM, retrieval
-└── document_processor.py   # DocumentProcessor class — PDF extraction, chunking, indexing
+├── rag_service.py          # RAGService — embeddings, Qdrant, LLM selection, retrieval, dedup
+└── document_processor.py   # DocumentProcessor — PDF extraction, chunking, indexing
 
 backend/app/api/
-├── chat.py                 # POST /chat — calls rag_service.generate_answer()
-└── documents.py            # POST /upload-manual — calls DocumentProcessor.process_document()
+├── chat.py                 # POST /api/v1/chat — calls rag_service.generate_answer()
+├── documents.py            # POST /api/v1/upload-manual — calls DocumentProcessor
+└── devices.py              # GET  /api/v1/devices — dynamic lookup from ManualDocument
 
 backend/app/core/
-└── config.py               # All RAG settings (chunk_size, top_k, threshold, etc.)
+└── config.py               # All RAG settings (Qdrant, LLM, chunk, threshold, etc.)
+
+backend/evaluation/
+├── evaluate_rag.py          # Offline evaluation harness
+├── eval_questions_real.json # Ground-truth Q&A pairs
+└── discover_indexed_data.py # Inspect indexed Qdrant data
+
+backend/scripts/
+└── migrate_chroma_to_qdrant.py  # One-time ChromaDB → Qdrant migration
 ```

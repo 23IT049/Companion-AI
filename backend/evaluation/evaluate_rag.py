@@ -220,7 +220,7 @@ class RAGEvaluator:
             t1 = time.perf_counter()
             try:
                 gen_result = await self.rag.generate_answer(
-                    query=question, device_type=device, brand=brand, model=model
+                    query=question, device_type=device, brand=brand, model=model, ai_model="groq"
                 )
                 answer = gen_result.get("answer", "")
             except Exception as e:
