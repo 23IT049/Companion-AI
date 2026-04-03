@@ -48,6 +48,7 @@ class Conversation(Document):
     
     conversation_id: Indexed(str) = Field(default_factory=lambda: str(uuid.uuid4()))
     user: Link[User]
+    title: Optional[str] = None          # LLM-generated, set after first message
     device_type: Optional[str] = None
     brand: Optional[str] = None
     model: Optional[str] = None

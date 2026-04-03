@@ -32,6 +32,7 @@ async def chat(
     """
     try:
         # Get or create conversation
+        is_new_conversation = not bool(request.conversation_id)
         if request.conversation_id:
             conversation = await Conversation.find_one(
                 {"conversation_id": request.conversation_id}
@@ -85,6 +86,20 @@ async def chat(
             sources=[source.dict() for source in sources]
         )
         await assistant_message.insert()
+
+        # Generate an LLM title for brand-new conversations
+        generated_title: str | None = None
+        if is_new_conversation:
+            try:
+                generated_title = await rag_service.generate_title(
+                    first_message=request.query,
+                    ai_model=request.ai_model or "gemini",
+                )
+                conversation.title = generated_title
+                await conversation.save()
+                logger.info(f"Title set for conversation {conversation.conversation_id}: {generated_title}")
+            except Exception as title_err:
+                logger.warning(f"Could not generate title: {title_err}")
         
         logger.info(f"Generated response for conversation {conversation.conversation_id}")
         
@@ -93,7 +108,8 @@ async def chat(
             sources=sources,
             conversation_id=conversation.conversation_id,
             message_id=assistant_message.message_id,
-            timestamp=assistant_message.created_at
+            timestamp=assistant_message.created_at,
+            title=generated_title,
         )
         
     except Exception as e:
@@ -196,6 +212,7 @@ async def list_conversations(
         responses.append(
             ConversationResponse(
                 conversation_id=conv.conversation_id,
+                title=conv.title,
                 device_type=conv.device_type,
                 brand=conv.brand,
                 model=conv.model,

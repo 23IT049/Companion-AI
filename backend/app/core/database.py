@@ -24,17 +24,19 @@ class Database:
         """Connect to MongoDB and initialize Beanie ODM."""
         try:
             logger.info(f"Connecting to MongoDB at {settings.mongodb_url}")
-            
+
             cls.client = AsyncIOMotorClient(
                 settings.mongodb_url,
                 maxPoolSize=settings.mongodb_max_pool_size,
                 minPoolSize=settings.mongodb_min_pool_size,
-                serverSelectionTimeoutMS=5000,
+                serverSelectionTimeoutMS=30000,   # 30s — Atlas needs time for replica set discovery
+                connectTimeoutMS=30000,           # 30s — TLS + network handshake
+                socketTimeoutMS=30000,            # 30s — per-operation socket timeout
             )
-            
+
             # Get database
             db = cls.client[settings.mongodb_db_name]
-            
+
             # Initialize Beanie with document models
             await init_beanie(
                 database=db,
@@ -47,9 +49,9 @@ class Database:
                     DeviceCategory,
                 ]
             )
-            
+
             logger.info("Successfully connected to MongoDB and initialized Beanie")
-            
+
         except Exception as e:
             logger.error(f"Failed to connect to MongoDB: {e}")
             raise

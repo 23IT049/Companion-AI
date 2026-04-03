@@ -296,6 +296,46 @@ class RAGService:
             return []
 
     # ------------------------------------------------------------------
+    # Title generation
+    # ------------------------------------------------------------------
+
+    async def generate_title(self, first_message: str, ai_model: str = "gemini") -> str:
+        """Generate a short, descriptive chat title from the first user message.
+
+        Returns a 4-6 word title, or a truncated fallback if the LLM fails.
+        """
+        try:
+            prompt = (
+                "Generate a short, descriptive title (4-6 words max) for a chat session "
+                "that starts with this user message. Reply with ONLY the title — no quotes, "
+                "no punctuation at the end, no explanation.\n\n"
+                f"User message: {first_message[:300]}"
+            )
+
+            active_llm = (
+                self.groq_llm
+                if ai_model == "groq" and self.groq_llm is not None
+                else self.llm
+            )
+
+            if active_llm is None:
+                raise ValueError("No LLM available")
+
+            response = await active_llm.ainvoke(prompt)
+            title = (response.content if hasattr(response, "content") else str(response)).strip()
+
+            # Strip surrounding quotes the LLM sometimes adds
+            title = title.strip('"\'')
+
+            # Hard cap at 60 chars
+            return title[:60] if title else first_message[:40]
+
+        except Exception as e:
+            logger.warning(f"Title generation failed: {e}")
+            # Graceful fallback: first 40 chars of the message
+            return first_message[:40].strip()
+
+    # ------------------------------------------------------------------
     # Answer generation
     # ------------------------------------------------------------------
 

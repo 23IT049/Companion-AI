@@ -29,6 +29,7 @@ const Sidebar = ({ currentConversationId, onSelectConversation, onNewChat, isOpe
     };
 
     const getConvLabel = (conv) => {
+        if (conv.title) return conv.title;
         if (conv.device_type) return `${conv.brand || ''} ${conv.device_type}`.trim();
         return new Date(conv.created_at || conv.updated_at).toLocaleDateString();
     };

@@ -85,6 +85,7 @@ class ChatResponse(BaseModel):
     conversation_id: str
     message_id: str
     timestamp: datetime
+    title: Optional[str] = None          # Populated only on the first message
     
     class Config:
         json_schema_extra = {
@@ -165,6 +166,7 @@ class DeviceListResponse(BaseModel):
 class ConversationResponse(BaseModel):
     """Response model for conversation details."""
     conversation_id: str
+    title: Optional[str] = None
     device_type: Optional[str]
     brand: Optional[str]
     model: Optional[str]
