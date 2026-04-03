@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Plus, PanelLeft } from 'lucide-react';
+import { MessageSquare, Plus, PanelLeft, LogOut, Settings } from 'lucide-react';
 import { chatAPI } from '../services/api';
+import UserProfileModal from './UserProfileModal';
 import './Sidebar.css';
 
-const Sidebar = ({ currentConversationId, onSelectConversation, onNewChat, isOpen, toggleSidebar }) => {
+const Sidebar = ({ currentConversationId, onSelectConversation, onNewChat, isOpen, toggleSidebar, onLogout }) => {
     const [conversations, setConversations] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [profileOpen, setProfileOpen] = useState(false);
+
+    const [userEmail, setUserEmail]   = useState(
+        localStorage.getItem('user_email') || localStorage.getItem('email') || 'user@email.com'
+    );
+    const [avatarColor, setAvatarColor] = useState(null);
+    const [fullName, setFullName]       = useState(localStorage.getItem('user_full_name') || '');
+
+    const userInitial = (fullName || userEmail).charAt(0).toUpperCase();
 
     useEffect(() => {
         loadConversations();
@@ -34,6 +44,19 @@ const Sidebar = ({ currentConversationId, onSelectConversation, onNewChat, isOpe
         return new Date(conv.created_at || conv.updated_at).toLocaleDateString();
     };
 
+    const handleProfileUpdate = (updated) => {
+        if (updated.email)       setUserEmail(updated.email);
+        if (updated.full_name !== undefined) {
+            setFullName(updated.full_name || '');
+            if (updated.full_name) localStorage.setItem('user_full_name', updated.full_name);
+        }
+        if (updated.avatar_color) setAvatarColor(updated.avatar_color);
+    };
+
+    const avatarStyle = avatarColor
+        ? { background: avatarColor }
+        : {};
+
     return (
         <>
             {/* Mobile backdrop */}
@@ -44,7 +67,6 @@ const Sidebar = ({ currentConversationId, onSelectConversation, onNewChat, isOpe
                 {/* ── Header ── */}
                 <div className={`sidebar-header ${isCollapsed ? 'collapsed-header' : ''}`}>
                     {isCollapsed ? (
-                        /* Collapsed: toggle button, then new chat */
                         <>
                             <button className="new-chat-icon-btn" onClick={onNewChat} title="New Chat">
                                 <Plus size={20} />
@@ -54,7 +76,6 @@ const Sidebar = ({ currentConversationId, onSelectConversation, onNewChat, isOpe
                             </button>
                         </>
                     ) : (
-                        /* Expanded: full new-chat button + toggle */
                         <>
                             <button className="new-chat-button" onClick={onNewChat}>
                                 <Plus size={18} />
@@ -100,7 +121,53 @@ const Sidebar = ({ currentConversationId, onSelectConversation, onNewChat, isOpe
                         </ul>
                     )}
                 </div>
+
+                {/* ── Profile Footer ── */}
+                <div className={`sidebar-profile ${isCollapsed ? 'collapsed' : ''}`}>
+                    {/* Clicking the avatar / name opens the profile modal */}
+                    <button
+                        className="profile-identity-btn"
+                        onClick={() => setProfileOpen(true)}
+                        title="Edit profile"
+                    >
+                        <div className="profile-avatar" style={avatarStyle}>{userInitial}</div>
+                        {!isCollapsed && (
+                            <div className="profile-info">
+                                {fullName && <span className="profile-name">{fullName}</span>}
+                                <span className="profile-email" title={userEmail}>{userEmail}</span>
+                            </div>
+                        )}
+                    </button>
+
+                    {!isCollapsed && (
+                        <button
+                            className="profile-settings-btn"
+                            onClick={() => setProfileOpen(true)}
+                            title="Account settings"
+                        >
+                            <Settings size={15} />
+                        </button>
+                    )}
+
+                    {onLogout && (
+                        <button
+                            className="profile-logout-btn"
+                            onClick={onLogout}
+                            title="Logout"
+                        >
+                            <LogOut size={16} />
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {/* Profile modal */}
+            <UserProfileModal
+                isOpen={profileOpen}
+                onClose={() => setProfileOpen(false)}
+                onProfileUpdate={handleProfileUpdate}
+                onLogout={onLogout}
+            />
         </>
     );
 };

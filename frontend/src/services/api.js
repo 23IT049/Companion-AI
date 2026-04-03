@@ -57,15 +57,37 @@ export const authAPI = {
         if (response.data.access_token) {
             localStorage.setItem('access_token', response.data.access_token);
         }
+        // Persist email so the sidebar profile can display it
+        localStorage.setItem('user_email', email);
         return response.data;
     },
 
     logout: () => {
         localStorage.removeItem('access_token');
+        localStorage.removeItem('user_email');
     },
 
-    getCurrentUser: async () => {
+    /** READ – full profile */
+    getProfile: async () => {
         const response = await apiClient.get('/auth/me');
+        return response.data;
+    },
+
+    /** UPDATE – name, bio, avatar_color */
+    updateProfile: async ({ full_name, bio, avatar_color }) => {
+        const response = await apiClient.put('/auth/me', { full_name, bio, avatar_color });
+        return response.data;
+    },
+
+    /** UPDATE – change password */
+    changePassword: async (current_password, new_password) => {
+        const response = await apiClient.put('/auth/me/password', { current_password, new_password });
+        return response.data;
+    },
+
+    /** DELETE – remove account permanently */
+    deleteAccount: async () => {
+        const response = await apiClient.delete('/auth/me');
         return response.data;
     },
 };

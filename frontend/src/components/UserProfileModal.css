@@ -1,0 +1,399 @@
+/* ── Overlay ── */
+.upm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(6px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: upm-fade-in 0.18s ease;
+}
+
+@keyframes upm-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ── Modal panel ── */
+.upm-modal {
+    width: 100%;
+    max-width: 460px;
+    border-radius: 18px;
+    border: 1px solid var(--dark-border);
+    background: var(--dark-surface);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    animation: upm-slide-up 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    max-height: 92vh;
+    overflow-y: auto;
+}
+
+@keyframes upm-slide-up {
+    from { transform: translateY(28px) scale(0.97); opacity: 0; }
+    to   { transform: translateY(0)    scale(1);    opacity: 1; }
+}
+
+/* ── Header ── */
+.upm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 20px 0;
+}
+
+.upm-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--dark-text);
+    margin: 0;
+}
+
+.upm-close {
+    background: transparent;
+    border: none;
+    color: var(--dark-text-secondary);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 8px;
+    display: flex;
+    transition: all 0.15s;
+}
+
+.upm-close:hover {
+    background: var(--dark-surface-light);
+    color: var(--dark-text);
+}
+
+/* ── Avatar row ── */
+.upm-avatar-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px 0;
+}
+
+.upm-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 1.3rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.12);
+    transition: background 0.2s;
+}
+
+.upm-avatar-info {
+    min-width: 0;
+}
+
+.upm-display-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--dark-text);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.upm-email {
+    font-size: 0.8rem;
+    color: var(--dark-text-secondary);
+    margin: 2px 0 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Tabs ── */
+.upm-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 16px 20px 0;
+    border-bottom: 1px solid var(--dark-border);
+    margin: 0 0 4px;
+}
+
+.upm-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--dark-text-secondary);
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+}
+
+.upm-tab:hover {
+    color: var(--dark-text);
+}
+
+.upm-tab.active {
+    color: var(--primary-400);
+    border-bottom-color: var(--primary-400);
+}
+
+/* ── Form ── */
+.upm-form {
+    padding: 16px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.upm-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    position: relative;
+}
+
+.upm-field label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--dark-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.upm-field input,
+.upm-field textarea {
+    background: var(--dark-surface-light, rgba(255,255,255,0.06));
+    border: 1px solid var(--dark-border);
+    border-radius: 10px;
+    color: var(--dark-text);
+    font-size: 0.9rem;
+    padding: 9px 12px;
+    outline: none;
+    resize: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    font-family: inherit;
+}
+
+.upm-field input:focus,
+.upm-field textarea:focus {
+    border-color: var(--primary-400);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.18);
+}
+
+.upm-char-count {
+    font-size: 0.72rem;
+    color: var(--dark-text-secondary);
+    text-align: right;
+    margin-top: 2px;
+}
+
+/* ── Color palette ── */
+.upm-color-palette {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-top: 4px;
+}
+
+.upm-color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.upm-color-swatch:hover {
+    transform: scale(1.18);
+}
+
+.upm-color-swatch.selected {
+    border-color: #fff;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.35);
+    transform: scale(1.12);
+}
+
+/* ── Messages ── */
+.upm-msg {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.upm-msg.success {
+    background: rgba(16, 185, 129, 0.14);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.upm-msg.error {
+    background: rgba(239, 68, 68, 0.12);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.22);
+}
+
+/* ── Buttons ── */
+.upm-btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+}
+
+.upm-btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(14, 165, 233, 0.35);
+}
+
+.upm-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Password wrapper ── */
+.upm-pw-wrap {
+    position: relative;
+}
+
+.upm-pw-wrap input {
+    width: 100%;
+    padding-right: 38px;
+    box-sizing: border-box;
+}
+
+.upm-eye {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--dark-text-secondary);
+    cursor: pointer;
+    display: flex;
+    padding: 2px;
+}
+
+.upm-eye:hover {
+    color: var(--dark-text);
+}
+
+/* ── Section label ── */
+.upm-section-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--dark-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin: 4px 0 0;
+}
+
+.upm-section-label.danger {
+    color: #f87171;
+}
+
+/* ── Danger zone ── */
+.upm-danger-zone {
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: rgba(239, 68, 68, 0.04);
+    margin-top: 8px;
+}
+
+.upm-danger-desc {
+    font-size: 0.83rem;
+    color: var(--dark-text-secondary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.upm-danger-input {
+    background: var(--dark-surface-light, rgba(255,255,255,0.06));
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-radius: 8px;
+    color: var(--dark-text);
+    font-size: 0.9rem;
+    padding: 8px 12px;
+    outline: none;
+    font-family: monospace;
+    transition: border-color 0.15s;
+}
+
+.upm-danger-input:focus {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.upm-btn-danger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+}
+
+.upm-btn-danger:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.22);
+    border-color: #ef4444;
+    transform: translateY(-1px);
+}
+
+.upm-btn-danger:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+    .upm-modal {
+        border-radius: 16px 16px 0 0;
+        max-height: 88vh;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-width: 100%;
+    }
+
+    .upm-overlay {
+        align-items: flex-end;
+        padding: 0;
+    }
+}

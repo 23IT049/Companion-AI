@@ -187,6 +187,7 @@ const ChatInterface = ({ onLogout }) => {
                 onNewChat={handleNewChat}
                 isOpen={isSidebarOpen}
                 toggleSidebar={toggleSidebar}
+                onLogout={onLogout}
             />
             <div className="chat-interface">
                 <div className="chat-header glass-effect">

@@ -43,6 +43,31 @@ class UserResponse(BaseModel):
     created_at: datetime
 
 
+class UserProfileResponse(BaseModel):
+    """Extended response model including profile fields."""
+    user_id: str
+    email: str
+    full_name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_color: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class UserUpdate(BaseModel):
+    """Request model for updating user profile."""
+    full_name: Optional[str] = Field(None, max_length=100)
+    bio: Optional[str] = Field(None, max_length=300)
+    avatar_color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
+
+
+class ChangePasswordRequest(BaseModel):
+    """Request model for changing password."""
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+
 # ============================================================================
 # Chat Models
 # ============================================================================

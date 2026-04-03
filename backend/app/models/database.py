@@ -32,6 +32,10 @@ class User(Document):
     email: Indexed(EmailStr, unique=True)
     hashed_password: str
     is_active: bool = True
+    # Profile fields
+    full_name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_color: Optional[str] = None   # hex color chosen by user
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
