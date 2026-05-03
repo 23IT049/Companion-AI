@@ -2,9 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { MessageSquare, Plus, PanelLeft, LogOut, Settings } from 'lucide-react';
 import { chatAPI } from '../services/api';
 import UserProfileModal from './UserProfileModal';
+import DeviceSelector from './DeviceSelector';
 import './Sidebar.css';
 
-const Sidebar = ({ currentConversationId, onSelectConversation, onNewChat, isOpen, toggleSidebar, onLogout }) => {
+const Sidebar = ({
+    currentConversationId,
+    onSelectConversation,
+    onNewChat,
+    isOpen,
+    toggleSidebar,
+    onLogout,
+    deviceType,
+    brand,
+    model,
+    onDeviceTypeChange,
+    onBrandChange,
+    onModelChange
+}) => {
     const [conversations, setConversations] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -68,9 +82,6 @@ const Sidebar = ({ currentConversationId, onSelectConversation, onNewChat, isOpe
                 <div className={`sidebar-header ${isCollapsed ? 'collapsed-header' : ''}`}>
                     {isCollapsed ? (
                         <>
-                            <button className="new-chat-icon-btn" onClick={onNewChat} title="New Chat">
-                                <Plus size={20} />
-                            </button>
                             <button className="sidebar-toggle-btn" onClick={() => setIsCollapsed(c => !c)} title="Expand sidebar">
                                 <PanelLeft size={20} />
                             </button>
@@ -88,11 +99,29 @@ const Sidebar = ({ currentConversationId, onSelectConversation, onNewChat, isOpe
                     )}
                 </div>
 
+                {/* ── Fixed Device Selector ── */}
+                {!isCollapsed && (
+                    <div className="sidebar-device-selector">
+                        <DeviceSelector
+                            deviceType={deviceType}
+                            brand={brand}
+                            model={model}
+                            onDeviceTypeChange={onDeviceTypeChange}
+                            onBrandChange={onBrandChange}
+                            onModelChange={onModelChange}
+                        />
+                    </div>
+                )}
+
+                {/* ── Fixed Recent Chats Title ── */}
+                {!isCollapsed && (
+                    <div className="sidebar-title-container">
+                        <p className="sidebar-title">Recent Chats</p>
+                    </div>
+                )}
+
                 {/* ── Body ── */}
                 <div className="sidebar-content">
-                    {!isCollapsed && (
-                        <p className="sidebar-title">Recent Chats</p>
-                    )}
 
                     {isLoading ? (
                         <div className="sidebar-loading">{isCollapsed ? '…' : 'Loading...'}</div>

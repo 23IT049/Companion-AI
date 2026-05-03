@@ -367,3 +367,24 @@
 .sidebar-profile.collapsed .profile-logout-btn {
     display: none;
 }
+
+/* ── Device Selector in Sidebar ── */
+.sidebar-device-selector {
+    padding: 12px;
+    border-bottom: 1px solid var(--dark-border);
+    flex-shrink: 0;
+}
+
+.sidebar-device-selector .device-selector {
+    grid-template-columns: 1fr; /* Force vertical stacking */
+    gap: var(--spacing-sm);
+}
+
+.sidebar-title-container {
+    padding: 12px 12px 8px 12px;
+    flex-shrink: 0;
+}
+
+.sidebar-title-container .sidebar-title {
+    margin-bottom: 0; /* Remove bottom margin to let sidebar-content padding handle the gap */
+}

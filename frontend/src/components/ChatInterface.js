@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, LogOut, Menu, ChevronDown } from 'lucide-react';
+import { Send, Loader2, Menu, ChevronDown } from 'lucide-react';
 import './ChatInterface.css';
 import MessageBubble from './MessageBubble';
-import DeviceSelector from './DeviceSelector';
 import TypingIndicator from './TypingIndicator';
 import Sidebar from './Sidebar';
 import { chatAPI } from '../services/api';
@@ -35,7 +34,11 @@ const ChatInterface = ({ onLogout }) => {
     };
 
     useEffect(() => {
-        scrollToBottom();
+        // Only auto-scroll if there are actual messages.
+        // Otherwise, the empty state gets scrolled to the bottom, hiding the top!
+        if (messages.length > 0) {
+            scrollToBottom();
+        }
     }, [messages]);
 
     // Close model dropdown when clicking outside
@@ -188,6 +191,12 @@ const ChatInterface = ({ onLogout }) => {
                 isOpen={isSidebarOpen}
                 toggleSidebar={toggleSidebar}
                 onLogout={onLogout}
+                deviceType={deviceType}
+                brand={brand}
+                model={model}
+                onDeviceTypeChange={setDeviceType}
+                onBrandChange={setBrand}
+                onModelChange={setModel}
             />
             <div className="chat-interface">
                 <div className="chat-header glass-effect">
@@ -200,19 +209,6 @@ const ChatInterface = ({ onLogout }) => {
                             <p className="header-subtitle">Get expert help with your device problems</p>
                         </div>
                     </div>
-                    <DeviceSelector
-                        deviceType={deviceType}
-                        brand={brand}
-                        model={model}
-                        onDeviceTypeChange={setDeviceType}
-                        onBrandChange={setBrand}
-                        onModelChange={setModel}
-                    />
-                    {onLogout && (
-                        <button className="logout-button" onClick={onLogout} title="Logout">
-                            <LogOut size={20} />
-                        </button>
-                    )}
                 </div>
 
                 <div className="chat-messages">
