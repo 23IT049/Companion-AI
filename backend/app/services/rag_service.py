@@ -434,6 +434,13 @@ class RAGService:
         with a `retry_delay`-second pause.  Embeddings are cached so we never
         recompute them on a retry.
         """
+        # Safety net: ensure collection exists even if init failed earlier
+        if self.qdrant_client is not None:
+            try:
+                self._ensure_collection()
+            except Exception as ec:
+                logger.warning(f"ensure_collection in add_documents failed: {ec}")
+
         total = len(texts)
         added = 0
         loop = asyncio.get_running_loop()
@@ -517,6 +524,9 @@ class RAGService:
           Schema B (ChromaDB mig.) – document_id nested under metadata
         """
         try:
+            # Safety net: ensure collection exists before trying to delete from it
+            if self.qdrant_client is not None:
+                self._ensure_collection()
             self.qdrant_client.delete(
                 collection_name=settings.qdrant_collection_name,
                 points_selector=Filter(
