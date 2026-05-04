@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Plus, PanelLeft, LogOut, Settings } from 'lucide-react';
+import { MessageSquare, Plus, PanelLeft, LogOut, Settings, Trash2, X, Check } from 'lucide-react';
 import { chatAPI } from '../services/api';
 import UserProfileModal from './UserProfileModal';
 import DeviceSelector from './DeviceSelector';
@@ -23,6 +23,7 @@ const Sidebar = ({
     const [isLoading, setIsLoading] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
     const [userEmail, setUserEmail]   = useState(
         localStorage.getItem('user_email') || localStorage.getItem('email') || 'user@email.com'
@@ -65,6 +66,32 @@ const Sidebar = ({
             if (updated.full_name) localStorage.setItem('user_full_name', updated.full_name);
         }
         if (updated.avatar_color) setAvatarColor(updated.avatar_color);
+    };
+
+    const handleDeleteConversation = async (convId, e) => {
+        e.stopPropagation();
+        if (confirmDeleteId !== convId) {
+            setConfirmDeleteId(convId);
+            return;
+        }
+        // Confirmed — delete
+        try {
+            await chatAPI.deleteConversation(convId);
+            setConversations(prev => prev.filter(c => c.conversation_id !== convId));
+            // If we just deleted the active conversation, start a new one
+            if (currentConversationId === convId) {
+                onNewChat();
+            }
+        } catch (err) {
+            console.error('Error deleting conversation:', err);
+        } finally {
+            setConfirmDeleteId(null);
+        }
+    };
+
+    const cancelDelete = (e) => {
+        e.stopPropagation();
+        setConfirmDeleteId(null);
     };
 
     const avatarStyle = avatarColor
@@ -132,10 +159,10 @@ const Sidebar = ({
                     ) : (
                         <ul className="conversation-list">
                             {conversations.map((conv) => (
-                                <li key={conv.conversation_id}>
+                                <li key={conv.conversation_id} className="conv-item-wrap">
                                     <button
                                         className={`conversation-item ${currentConversationId === conv.conversation_id ? 'active' : ''} ${isCollapsed ? 'icon-only' : ''}`}
-                                        onClick={() => onSelectConversation(conv.conversation_id)}
+                                        onClick={() => { setConfirmDeleteId(null); onSelectConversation(conv.conversation_id); }}
                                         title={getConvLabel(conv)}
                                     >
                                         <MessageSquare size={18} className="conv-icon" />
@@ -145,6 +172,36 @@ const Sidebar = ({
                                             </span>
                                         )}
                                     </button>
+
+                                    {/* Delete controls – only when expanded */}
+                                    {!isCollapsed && (
+                                        confirmDeleteId === conv.conversation_id ? (
+                                            <div className="conv-delete-confirm">
+                                                <button
+                                                    className="conv-delete-yes"
+                                                    title="Confirm delete"
+                                                    onClick={(e) => handleDeleteConversation(conv.conversation_id, e)}
+                                                >
+                                                    <Check size={13} />
+                                                </button>
+                                                <button
+                                                    className="conv-delete-no"
+                                                    title="Cancel"
+                                                    onClick={cancelDelete}
+                                                >
+                                                    <X size={13} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                className="conv-delete-btn"
+                                                title="Delete chat"
+                                                onClick={(e) => handleDeleteConversation(conv.conversation_id, e)}
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        )
+                                    )}
                                 </li>
                             ))}
                         </ul>

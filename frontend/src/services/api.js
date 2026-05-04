@@ -126,6 +126,11 @@ export const chatAPI = {
         });
         return response.data;
     },
+
+    deleteConversation: async (conversationId) => {
+        const response = await apiClient.delete(`/conversation/${conversationId}`);
+        return response.data;
+    },
 };
 
 // ============================================================================

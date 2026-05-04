@@ -244,6 +244,82 @@
     flex: 1;
 }
 
+/* ── Delete button on conversation items ── */
+.conv-item-wrap {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    position: relative;
+}
+
+.conv-item-wrap .conversation-item {
+    flex: 1;
+    min-width: 0;
+}
+
+.conv-delete-btn {
+    flex-shrink: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--dark-text-secondary);
+    border-radius: var(--radius-sm);
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.conv-item-wrap:hover .conv-delete-btn {
+    display: flex;
+}
+
+.conv-delete-btn:hover {
+    background: rgba(248, 113, 113, 0.12);
+    border-color: rgba(248, 113, 113, 0.2);
+    color: #f87171;
+}
+
+/* Confirm row */
+.conv-delete-confirm {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.conv-delete-yes,
+.conv-delete-no {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.conv-delete-yes {
+    background: rgba(52, 211, 153, 0.1);
+    border-color: rgba(52, 211, 153, 0.2);
+    color: #34d399;
+}
+.conv-delete-yes:hover {
+    background: rgba(52, 211, 153, 0.22);
+}
+
+.conv-delete-no {
+    background: rgba(248, 113, 113, 0.1);
+    border-color: rgba(248, 113, 113, 0.2);
+    color: #f87171;
+}
+.conv-delete-no:hover {
+    background: rgba(248, 113, 113, 0.22);
+}
+
 .sidebar-profile {
     display: flex;
     align-items: center;

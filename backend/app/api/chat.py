@@ -223,3 +223,41 @@ async def list_conversations(
         )
     
     return responses
+
+
+@router.delete("/conversation/{conversation_id}", status_code=status.HTTP_200_OK)
+async def delete_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Delete a conversation and all its messages.
+
+    Args:
+        conversation_id: Conversation ID
+        current_user: Authenticated user
+
+    Returns:
+        Success message
+    """
+    conversation = await Conversation.find_one(
+        {
+            "conversation_id": conversation_id,
+            "user.$id": current_user.id,
+        }
+    )
+
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found or not authorized",
+        )
+
+    # Delete all messages in this conversation first
+    messages = await Message.find({"conversation.$id": conversation.id}).to_list()
+    for msg in messages:
+        await msg.delete()
+
+    await conversation.delete()
+    logger.info(f"Conversation {conversation_id} deleted by {current_user.email}")
+    return {"message": "Conversation deleted successfully"}
