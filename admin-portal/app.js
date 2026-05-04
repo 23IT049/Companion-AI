@@ -4,7 +4,7 @@
  * Talks directly to the FastAPI backend at http://localhost:8000
  */
 
-const API = 'http://localhost:8000/api/v1';
+const API = 'https://darshilkothiya-companion-ai.hf.space/api/v1';
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
 const ADMIN_TOKEN_KEY = 'admin_access_token';
