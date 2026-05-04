@@ -12,7 +12,7 @@ const apiClient = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 30000, // 30 seconds
+    timeout: 120000, // 2 minutes – large PDF uploads can be slow
 });
 
 // Request interceptor to add auth token
@@ -65,6 +65,12 @@ export const authAPI = {
     logout: () => {
         localStorage.removeItem('access_token');
         localStorage.removeItem('user_email');
+    },
+
+    /** ADMIN – login that rejects non-admin accounts */
+    adminLogin: async (email, password) => {
+        const response = await apiClient.post('/auth/admin/login', { email, password });
+        return response.data;
     },
 
     /** READ – full profile */
@@ -164,6 +170,11 @@ export const documentsAPI = {
 
     deleteDocument: async (documentId) => {
         const response = await apiClient.delete(`/documents/${documentId}`);
+        return response.data;
+    },
+
+    reindexDocument: async (documentId) => {
+        const response = await apiClient.post(`/documents/${documentId}/reindex`);
         return response.data;
     },
 };

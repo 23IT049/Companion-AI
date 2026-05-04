@@ -278,9 +278,8 @@ async def get_document(
             detail="Document not found"
         )
     
-    # Verify ownership
-    await document.fetch_link(ManualDocument.uploaded_by)
-    if document.uploaded_by.id != current_user.id:
+    # Verify ownership – compare raw Link ref id to avoid fetch_link aggregate bug
+    if document.uploaded_by.ref.id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this document"
@@ -324,9 +323,8 @@ async def delete_document(
             detail="Document not found"
         )
     
-    # Verify ownership
-    await document.fetch_link(ManualDocument.uploaded_by)
-    if document.uploaded_by.id != current_user.id:
+    # Verify ownership – compare raw Link ref id to avoid fetch_link aggregate bug
+    if document.uploaded_by.ref.id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to delete this document"
@@ -376,9 +374,8 @@ async def reindex_document(
             detail="Document not found",
         )
 
-    # Verify ownership
-    await document.fetch_link(ManualDocument.uploaded_by)
-    if document.uploaded_by.id != current_user.id:
+    # Verify ownership – compare raw Link ref id to avoid fetch_link aggregate bug
+    if document.uploaded_by.ref.id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to reindex this document",

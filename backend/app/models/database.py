@@ -32,6 +32,7 @@ class User(Document):
     email: Indexed(EmailStr, unique=True)
     hashed_password: str
     is_active: bool = True
+    is_admin: bool = False
     # Profile fields
     full_name: Optional[str] = None
     bio: Optional[str] = None

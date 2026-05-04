@@ -51,6 +51,7 @@ class UserProfileResponse(BaseModel):
     bio: Optional[str] = None
     avatar_color: Optional[str] = None
     is_active: bool
+    is_admin: bool = False
     created_at: datetime
     updated_at: datetime
 

@@ -46,13 +46,21 @@ logs/
 *.sqlite
 *.sqlite3
 
-# Data directories
-data/uploads/*
-data/processed/*
-data/raw/*
-!data/uploads/.gitkeep
-!data/processed/.gitkeep
-!data/raw/.gitkeep
+# Data directories – uploaded manuals and processed files
+data/uploads/
+data/processed/
+data/raw/
+
+# Uploaded document files (PDFs, manuals) anywhere in the project
+*.pdf
+**/*.pdf
+backend/data/**/*.pdf
+backend/data/**/*.docx
+backend/data/**/*.txt
+
+# Admin portal helper scripts (contain DB credentials)
+backend/list_users.py
+backend/promote_admin.py
 
 # ChromaDB
 chroma_data/

@@ -89,6 +89,7 @@ async def get_current_user_info(current_user: User = Depends(get_current_active_
         bio=current_user.bio,
         avatar_color=current_user.avatar_color,
         is_active=current_user.is_active,
+        is_admin=current_user.is_admin,
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
     )
@@ -129,9 +130,72 @@ async def update_profile(
         bio=current_user.bio,
         avatar_color=current_user.avatar_color,
         is_active=current_user.is_active,
+        is_admin=current_user.is_admin,
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
     )
+
+
+# ── ADMIN LOGIN (rejects non-admins) ──────────────────────────────────────────
+
+@router.post("/admin/login", response_model=Token)
+async def admin_login(user_data: UserLogin):
+    """
+    Login endpoint specifically for the admin upload portal.
+    Returns 403 if the account is not an admin.
+    """
+    user = await User.find_one(User.email == user_data.email)
+
+    if not user or not verify_password(user_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user account",
+        )
+
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    access_token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=access_token_expires,
+    )
+    logger.info(f"Admin logged in: {user.email}")
+    return Token(access_token=access_token, token_type="bearer")
+
+
+# ── PROMOTE TO ADMIN (dev / superuser bootstrap) ─────────────────────────────
+
+@router.post("/promote", status_code=status.HTTP_200_OK)
+async def promote_to_admin(
+    email: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Grant admin rights to a user by email.
+    Only existing admins (or the first-run bootstrap) can call this.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can promote other users",
+        )
+    target = await User.find_one(User.email == email)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    await target.update({"$set": {"is_admin": True}})
+    logger.info(f"{current_user.email} promoted {email} to admin")
+    return {"message": f"{email} is now an admin"}
 
 
 # ── UPDATE password ───────────────────────────────────────────────────────────
